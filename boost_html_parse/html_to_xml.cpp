@@ -22,7 +22,8 @@ namespace detail {
 	bool is_slash(const wchar_t c) { return L'/' == c; }
 	void convert_to_lower(std::string& str) { for (auto& c : str) c = std::tolower(c); }
 	void convert_to_lower(std::wstring& str) { for (auto& c : str) c = std::towlower(c); }
-
+	bool is_space(const char c) { return 0 != std::isspace(c); }
+	bool is_space(const wchar_t c) { return 0 != std::iswspace(c); }
 	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
 	void remove_space_in_tag(std::basic_string<char_type>& str) {
 		for (
@@ -31,22 +32,33 @@ namespace detail {
 			open_tag_open_pos = get_tag_open_pos(str, open_tag_open_pos)
 		) {
 			size_t space_end_pos = open_tag_open_pos + 1;
-			while (std::isspace(str[space_end_pos])) ++space_end_pos;
+			while (is_space(str[space_end_pos])) ++space_end_pos;
 			const size_t space_num = space_end_pos - open_tag_open_pos - 1;
-			if (space_num) str.erase(open_tag_open_pos + 1, space_num);
+			if (space_num) str.erase(open_tag_open_pos + 1, space_num);//erase
 			auto f = std_future::overload(
 				[](const std::string& str, size_t offset) -> size_t { return str.find_first_of("/>", offset); },
 				[](const std::wstring& str, size_t offset) -> size_t { return str.find_first_of(L"/>", offset); }
 			);
-			const size_t pos = f(str, space_end_pos);
-			if (is_slash(str[pos])) {
+			size_t pos = f(str, space_end_pos);
+			const size_t open_tag_close_pos = get_tag_close_pos(str, pos);
+			const auto erase_info = [pos, open_tag_close_pos, &str]() noexcept -> std::pair<size_t, size_t> {
+				if (open_tag_close_pos == pos || open_tag_close_pos == pos + 1) return {};
+				size_t erase_num = 0, erase_begin = open_tag_close_pos - 2;
+				while (is_space(str[erase_begin])) {
+					--erase_begin;
+					++erase_num;
+				}
+				return { erase_begin + 1, erase_num };
+			}();
+			str.erase(erase_info.first, erase_info.second);
+			if (pos == open_tag_open_pos + 1 && is_slash(str[pos])) {
 				auto add_space = std_future::overload(
 					[](std::string& str, size_t pos) { str.insert(pos, 1U, ' '); },
 					[](std::wstring& str, size_t pos) { str.insert(pos, 1U, L' '); }
 				);
-				if (!std::isspace(str[pos - 1]) && !is_open_tag_mark(str[pos - 1])) add_space(str, pos);
+				if (!is_space(str[pos - 1]) && !is_open_tag_mark(str[pos - 1])) add_space(str, pos);//insert
 				const size_t open_tag_close_pos = get_tag_close_pos(str, pos);
-				if (1U < open_tag_close_pos - pos) str.erase(pos + 1, open_tag_close_pos - pos - 1);
+				if (1U < open_tag_close_pos - pos) str.erase(pos + 1, open_tag_close_pos - pos - 1);//erase
 				open_tag_open_pos = open_tag_close_pos;
 			}
 			else {
