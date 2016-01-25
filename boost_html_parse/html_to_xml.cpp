@@ -199,7 +199,7 @@ void convert_html_to_xml(std::wistream& is, std::wostream& os) {
 	using std::endl;
 	std::wstring buf;
 	//read and remove newline
-	for (std::wstring tmp; std::getline(is, buf);)
+	for (std::wstring tmp; std::getline(is, tmp);)
 		buf += tmp;//cat
 				   //convert
 	detail::remove_space_in_tag(buf);
