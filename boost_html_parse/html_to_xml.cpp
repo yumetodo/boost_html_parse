@@ -180,6 +180,16 @@ namespace html_to_xml {
 			}
 		}
 	}
+	void remove_declaration(std::string& str) {
+		//HTML has only 1 declaration before <head>
+		size_t declaration_begin_pos = str.find("<!doctype html");
+		str.erase(declaration_begin_pos, str.find_first_of('>', declaration_begin_pos));
+	}
+	void remove_declaration(std::wstring& str) {
+		//HTML has only 1 declaration before <head>
+		size_t declaration_begin_pos = str.find(L"<!doctype html");
+		str.erase(declaration_begin_pos, str.find_first_of(L'>', declaration_begin_pos));
+	}
 }
 void convert_html_to_xml(std::istream& is, std::ostream& os) {
 	using std::endl;
@@ -190,6 +200,7 @@ void convert_html_to_xml(std::istream& is, std::ostream& os) {
 	//convert
 	detail::remove_space_in_tag(buf);
 	detail::convert_to_lower(buf);
+	html_to_xml::remove_declaration(buf);
 	html_to_xml::close_tag(buf);
 	html_to_xml::ruby_replace(buf);
 	//write
@@ -205,6 +216,7 @@ void convert_html_to_xml(std::wistream& is, std::wostream& os) {
 				   //convert
 	detail::remove_space_in_tag(buf);
 	detail::convert_to_lower(buf);
+	html_to_xml::remove_declaration(buf);
 	html_to_xml::close_tag(buf);
 	html_to_xml::ruby_replace(buf);
 	//write
