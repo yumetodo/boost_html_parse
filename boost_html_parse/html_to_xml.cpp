@@ -166,7 +166,7 @@ namespace html_to_xml {
 		for (
 			size_t open_tag_open_pos = get_tag_open_pos(str);
 			std::basic_string<char_type>::npos != open_tag_open_pos;
-			open_tag_open_pos = get_tag_open_pos(str, open_tag_open_pos)
+			open_tag_open_pos = get_tag_open_pos(str, open_tag_open_pos + 1)
 		) {
 			if (tag_match(str, open_tag_open_pos + 1)) {
 				const size_t open_tag_close_pos = get_tag_close_pos(str, open_tag_open_pos);
@@ -176,6 +176,7 @@ namespace html_to_xml {
 				);
 				if (is_slash(str.at(open_tag_close_pos - 1)) || cmp(str, open_tag_close_pos + 1)) continue;
 				insert_space_slash(str, open_tag_close_pos);//<** ~> -> <** ~ />
+				open_tag_open_pos = open_tag_close_pos;
 			}
 		}
 	}
