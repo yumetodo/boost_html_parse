@@ -9,6 +9,11 @@
 #include <algorithm>
 #include <cwctype>
 #include <cwchar>
+#include <iostream>
+#include <fstream>
+#include <codecvt>
+
+#include <boost/optional.hpp>
 #include "overload.hpp"
 namespace detail {
 	using std::size_t;
@@ -31,39 +36,53 @@ namespace detail {
 			std::basic_string<char_type>::npos != open_tag_open_pos;
 			open_tag_open_pos = get_tag_open_pos(str, open_tag_open_pos)
 		) {
+			// <  ***> -> <***>
 			size_t space_end_pos = open_tag_open_pos + 1;
 			while (is_space(str[space_end_pos])) ++space_end_pos;
 			const size_t space_num = space_end_pos - open_tag_open_pos - 1;
 			if (space_num) str.erase(open_tag_open_pos + 1, space_num);//erase
+
+			// <***/  > -> <***/>
 			auto f = std_future::overload(
 				[](const std::string& str, size_t offset) -> size_t { return str.find_first_of("/>", offset); },
 				[](const std::wstring& str, size_t offset) -> size_t { return str.find_first_of(L"/>", offset); }
 			);
 			size_t pos = f(str, space_end_pos);
 			const size_t open_tag_close_pos = get_tag_close_pos(str, pos);
-			const auto erase_info = [pos, open_tag_close_pos, &str]() noexcept -> std::pair<size_t, size_t> {
-				if (open_tag_close_pos == pos || open_tag_close_pos == pos + 1) return {};
+			const auto erase_info = [pos, open_tag_close_pos, &str]() noexcept -> boost::optional<std::pair<size_t, size_t>> {
+				if (open_tag_close_pos == pos || open_tag_close_pos == pos + 1) return boost::optional<std::pair<size_t, size_t>>{};
 				size_t erase_num = 0, erase_begin = open_tag_close_pos - 2;
 				while (is_space(str[erase_begin])) {
 					--erase_begin;
 					++erase_num;
 				}
-				return { erase_begin + 1, erase_num };
+				return std::pair<size_t, size_t>{ erase_begin + 1, erase_num };
 			}();
-			str.erase(erase_info.first, erase_info.second);
-			if (pos == open_tag_open_pos + 1 && is_slash(str[pos])) {
+			if(erase_info) str.erase(erase_info->first, erase_info->second);//erase
+
+			if (is_slash(str[pos])) {
 				auto add_space = std_future::overload(
 					[](std::string& str, size_t pos) { str.insert(pos, 1U, ' '); },
 					[](std::wstring& str, size_t pos) { str.insert(pos, 1U, L' '); }
 				);
-				if (!is_space(str[pos - 1]) && !is_open_tag_mark(str[pos - 1])) add_space(str, pos);//insert
-				const size_t open_tag_close_pos = get_tag_close_pos(str, pos);
-				if (1U < open_tag_close_pos - pos) str.erase(pos + 1, open_tag_close_pos - pos - 1);//erase
-				open_tag_open_pos = open_tag_close_pos;
+				// <***/> -> <*** />
+				if (!is_space(str[pos - 1])) {
+					if(!is_open_tag_mark(str[pos - 1])) add_space(str, pos);//insert
+				}
+				// <***   /> -> <*** />
+				else {
+					const auto erase_info2 = [pos, &str]() noexcept -> boost::optional<std::pair<size_t, size_t>> {
+						size_t erase_num = 0, erase_begin = pos - 2;//一つ空白は残す
+						while (is_space(str[erase_begin])) {
+							--erase_begin;
+							++erase_num;
+						}
+						return (erase_num) ? std::pair<size_t, size_t>{ erase_begin + 1, erase_num } : boost::optional<std::pair<size_t, size_t>>{};
+					}();
+					if (erase_info2) str.erase(erase_info2->first, erase_info2->second);//erase
+				}
 			}
-			else {
-				open_tag_open_pos = pos;
-			}
+			open_tag_open_pos = open_tag_close_pos;
 		}
 	}
 	template<typename char_type> bool string_match_at_first(const char_type* key, size_t key_len, const std::basic_string<char_type>& str, size_t offset = 0U) noexcept {
@@ -183,8 +202,8 @@ namespace html_to_xml {
 			if (tag_match(str, open_tag_open_pos + 1)) {
 				const size_t open_tag_close_pos = get_tag_close_pos(str, open_tag_open_pos);
 				auto cmp = std_future::overload(
-					[](const std::string& str, size_t pos) { return std::strcmp("</", str.c_str() + pos); },
-					[](const std::wstring& str, size_t pos) { return std::wcscmp(L"</", str.c_str() + pos); }
+					[](const std::string& str, size_t pos) { return 0 == std::strcmp("</", str.c_str() + pos); },
+					[](const std::wstring& str, size_t pos) { return 0 == std::wcscmp(L"</", str.c_str() + pos); }
 				);
 				if (is_slash(str.at(open_tag_close_pos - 1)) || cmp(str, open_tag_close_pos + 1)) continue;
 				insert_space_slash(str, open_tag_close_pos);//<** ~> -> <** ~ />
@@ -223,8 +242,7 @@ void convert_html_to_xml(std::wistream& is, std::wostream& os) {
 	using std::endl;
 	std::wstring buf;
 	//read and remove newline
-	for (std::wstring tmp; std::getline(is, tmp);)
-		buf += tmp;//cat
+	for (std::wstring tmp; std::getline(is, tmp);) buf += tmp + L'\n';//cat
 				   //convert
 	detail::remove_space_in_tag(buf);
 	detail::convert_to_lower(buf);
