@@ -226,8 +226,7 @@ void convert_html_to_xml(std::istream& is, std::ostream& os) {
 	using std::endl;
 	std::string buf;
 	//read and remove newline
-	for (std::string tmp; std::getline(is, buf);) 
-		buf += tmp;//cat
+	for (std::string tmp; std::getline(is, tmp);) buf += tmp + '\n';//cat
 	//convert
 	detail::remove_space_in_tag(buf);
 	detail::convert_to_lower(buf);
@@ -249,9 +248,10 @@ void convert_html_to_xml(std::wistream& is, std::wostream& os) {
 	html_to_xml::remove_declaration(buf);
 	html_to_xml::close_tag(buf);
 	html_to_xml::ruby_replace(buf);
-	std::wofstream out("res.xml", std::ios::binary);
-	out.imbue(std::locale(std::locale(), new std::codecvt_utf8_utf16<wchar_t>()));
-	out << L"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << buf << std::endl;
+	//Debug output
+	//std::wofstream out("res.xml", std::ios::binary);
+	//out.imbue(std::locale(std::locale(), new std::codecvt_utf8_utf16<wchar_t>()));
+	//out << L"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << buf << std::endl;
 	//write
 	os << L"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl;//xml header
 	os << buf << std::endl;

@@ -98,7 +98,7 @@ namespace detail {
 				const boost::optional<size_t> search_re = tag_search(p.first, path, layer_level);
 				if (search_re) {
 					const detail::node_select_piece<char_type>& n = path[*search_re];
-					if (!n.attr || has_attribute(p.second, n.type, n.attr.get())) {
+					if (!n.attr || has_attribute(p.second, n.type, n.attr.get())) {//selectorに一致するか
 						if (path.size() == layer_level + 1) {
 							re.push_back(p.second.data());
 						}
@@ -120,7 +120,7 @@ namespace detail {
 		int dst[3];
 		for (auto& i : dst) i = fs.get();
 		constexpr int utf8[] = { 0xEF, 0xBB, 0xBF };
-		if (std::equal(std::begin(dst), std::end(dst), utf8)) fs.seekg(0);
+		if (!std::equal(std::begin(dst), std::end(dst), utf8)) fs.seekg(0);
 	}
 }
 std::vector<std::string> html_extract(const std::string& filename, const std::string& path_str) {
@@ -135,10 +135,11 @@ std::vector<std::string> html_extract(const std::string& filename, const std::st
 	convert_html_to_xml(file, ss);
 	read_xml(ss, pt, boost::property_tree::xml_parser::no_comments);
 	const auto path = detail::parse_path(path_str);
-	auto& body = pt.get_child(u8"body");//HTML has body tag. if not exist, exception will be thrown.
+	auto& body = pt.get_child(u8"html.body");//HTML has body tag. if not exist, exception will be thrown.
 	detail::html_extract_impl(re, body, path);//analyse
 	return re;
 }
+#ifndef __MINGW32__
 std::vector<std::wstring> html_extract(const std::wstring& filename, const std::wstring& path_str) {
 	if (!path_str.length()) return std::vector<std::wstring>();
 	std::vector<std::wstring> re;
@@ -155,3 +156,4 @@ std::vector<std::wstring> html_extract(const std::wstring& filename, const std::
 	detail::html_extract_impl(re, body, path);//analyse
 	return re;
 }
+#endif
