@@ -44,6 +44,7 @@ namespace detail {
 					[](const char c) { return '#' == c; },
 					[](const wchar_t c) { return L'#' == c; }
 				);
+				tag = str.substr(0, split_pos);
 				type = (is_sharp(str[split_pos])) ? specifier_type::id_ : specifier_type::class_;
 				attr = str.substr(split_pos + 1);
 			}
@@ -60,7 +61,8 @@ namespace detail {
 			//call std::basic_string<char_type> ->node_select_piece<char_type> convert constructor
 			re.emplace_back(std::basic_string<char_type>(path, current, found - current));
 		}
-		re.emplace_back(std::basic_string<char_type>(path, current, path.size() - current));
+		auto&& str = path.substr(current, path.size() - current);
+		re.emplace_back(std::move(str));
 		return re;//expect NRVO
 	}
 	bool has_attribute(const ptree& p, const std::string& attr_name, const std::string& attr) {
@@ -78,9 +80,11 @@ namespace detail {
 		return (specifier_type::none_ == attr_name) || has_attribute(p, (specifier_type::class_ == attr_name) ? L"class" : L"id", attr);
 	}
 	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
-	boost::optional<std::size_t> tag_search(const std::basic_string<char_type>& key, const std::vector<node_select_piece<char_type>>& path, std::size_t layer_level) {
-		for (auto i = layer_level; 0 <= i; --i) if (path[i].tag == key) return i;
-		return{};//none
+	boost::optional<std::size_t> tag_search(const std::basic_string<char_type>& key, const std::vector<node_select_piece<char_type>>& path, const std::size_t layer_level) {
+		for (auto i = layer_level; 0 < i; --i) {
+			if (path[i].tag == key) return i;
+		}
+		return (path.front().tag == key) ? std::size_t{} : boost::optional<std::size_t>{};//none
 	}
 	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
 	void html_extract_impl(std::vector<std::basic_string<char_type>>& re, const boost::property_tree::basic_ptree<std::basic_string<char_type>, std::basic_string<char_type>>& pt, const std::vector<node_select_piece<char_type>>& path, std::size_t layer_level = 0U) {//1~
@@ -88,10 +92,10 @@ namespace detail {
 			for (auto& p : pt) {
 				const boost::optional<std::size_t> search_re = tag_search(p.first, path, layer_level);
 				if (search_re) {
-					auto& n = path[*search_re];
+					const detail::node_select_piece<char_type>& n = path[*search_re];
 					if (!n.attr || has_attribute(p.second, n.type, n.attr.get())) {
 						if (path.size() == layer_level + 1) {
-							re.push_back(p.first);
+							re.push_back(p.second.data());
 						}
 						else {
 							html_extract_impl(re, p.second, path, *search_re + 1);//recursion
@@ -104,14 +108,11 @@ namespace detail {
 			}
 		}
 	}
-	void skip_utf8_bom(std::ifstream& fs) {
-		char a, b, c;
-		a = fs.get();
-		b = fs.get();
-		c = fs.get();
-		if (a != (char)0xEF || b != (char)0xBB || c != (char)0xBF) {
-			fs.seekg(0);//違ったら戻す
-		}
+	template<typename CharType>void skip_utf8_bom(std::basic_ifstream<CharType>& fs) {
+		int dst[3];
+		for (auto& i : dst) i = fs.get();
+		constexpr int utf8[] = { 0xEF, 0xBB, 0xBF };
+		if (std::equal(std::begin(dst), std::end(dst), utf8)) fs.seekg(0);
 	}
 }
 std::vector<std::string> html_extract(const std::string& filename, const std::string& path_str) {
@@ -142,7 +143,7 @@ std::vector<std::wstring> html_extract(const std::wstring& filename, const std::
 	convert_html_to_xml(file, ss);
 	read_xml(ss, pt, boost::property_tree::xml_parser::no_comments);
 	const auto path = detail::parse_path(path_str);
-	auto& body = pt.get_child(L"body");//HTML has body tag. if not exist, exception will be thrown.
+	auto& body = pt.get_child(L"html.body");//HTML has body tag. if not exist, exception will be thrown.
 	detail::html_extract_impl(re, body, path);//analyse
 	return re;
 }

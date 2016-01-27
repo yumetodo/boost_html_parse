@@ -194,3 +194,5 @@ ModelManifest.xml
 #other
 Log.txt
 *.VC.opendb
+res.xml
+*.config

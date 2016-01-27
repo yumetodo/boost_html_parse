@@ -214,12 +214,12 @@ namespace html_to_xml {
 	void remove_declaration(std::string& str) {
 		//HTML has only 1 declaration before <head>
 		size_t declaration_begin_pos = str.find("<!doctype html");
-		str.erase(declaration_begin_pos, str.find_first_of('>', declaration_begin_pos));
+		str.erase(declaration_begin_pos, str.find_first_of('<', str.find_first_of('>', declaration_begin_pos)));
 	}
 	void remove_declaration(std::wstring& str) {
 		//HTML has only 1 declaration before <head>
 		size_t declaration_begin_pos = str.find(L"<!doctype html");
-		str.erase(declaration_begin_pos, str.find_first_of(L'>', declaration_begin_pos));
+		str.erase(0, str.find_first_of(L'<', str.find_first_of(L'>', declaration_begin_pos)) + declaration_begin_pos - 1);
 	}
 }
 void convert_html_to_xml(std::istream& is, std::ostream& os) {
@@ -249,6 +249,9 @@ void convert_html_to_xml(std::wistream& is, std::wostream& os) {
 	html_to_xml::remove_declaration(buf);
 	html_to_xml::close_tag(buf);
 	html_to_xml::ruby_replace(buf);
+	std::wofstream out("res.xml", std::ios::binary);
+	out.imbue(std::locale(std::locale(), new std::codecvt_utf8_utf16<wchar_t>()));
+	out << L"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << buf << std::endl;
 	//write
 	os << L"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl;//xml header
 	os << buf << std::endl;
