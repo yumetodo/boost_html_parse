@@ -12,9 +12,13 @@
 #include "html_to_xml.hpp"
 #include "overload.hpp"
 namespace detail {
+	using std::size_t;
+	using std::vector;
+	using std::basic_string;
 	using boost::property_tree::ptree;
 	using boost::property_tree::wptree;
-	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
+	using boost::property_tree::basic_ptree;
+	template<typename char_type>
 	using ptree_c = boost::property_tree::basic_ptree<std::basic_string<char_type>, std::basic_string<char_type>>;
 	enum class specifier_type : std::uint8_t {
 		none_,
@@ -36,7 +40,7 @@ namespace detail {
 				[](const std::wstring& str) { return str.find_first_of(L"#."); }
 			);
 			const auto split_pos = f1(str);
-			if (std::basic_string<char_type>::npos == split_pos) {
+			if (basic_string<char_type>::npos == split_pos) {
 				tag = str;
 			}
 			else {
@@ -49,16 +53,17 @@ namespace detail {
 				attr = str.substr(split_pos + 1);
 			}
 		}
-		boost::optional<std::basic_string<char_type>> tag;
+		boost::optional<basic_string<char_type>> tag;
 		specifier_type type;
-		boost::optional<std::basic_string<char_type>> attr;
+		boost::optional<basic_string<char_type>> attr;
 	};
+	template<typename T> using node_piece_v = vector<node_select_piece<T>>;
 	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
-	std::vector<node_select_piece<char_type>> parse_path(const std::basic_string<char_type>& path) {
-		std::vector<node_select_piece<char_type>> re;
-		std::size_t current = 0;
-		for (std::size_t found; std::basic_string<char_type>::npos != (found = path.find_first_of(' ', current)); current = found + 1) {
-			//call std::basic_string<char_type> ->node_select_piece<char_type> convert constructor
+	node_piece_v<char_type> parse_path(const basic_string<char_type>& path) {
+		node_piece_v<char_type> re;
+		size_t current = 0;
+		for (size_t found; basic_string<char_type>::npos != (found = path.find_first_of(' ', current)); current = found + 1) {
+			//call basic_string<char_type> ->node_select_piece<char_type> convert constructor
 			re.emplace_back(std::basic_string<char_type>(path, current, found - current));
 		}
 		auto&& str = path.substr(current, path.size() - current);
@@ -80,17 +85,17 @@ namespace detail {
 		return (specifier_type::none_ == attr_name) || has_attribute(p, (specifier_type::class_ == attr_name) ? L"class" : L"id", attr);
 	}
 	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
-	boost::optional<std::size_t> tag_search(const std::basic_string<char_type>& key, const std::vector<node_select_piece<char_type>>& path, const std::size_t layer_level) {
+	boost::optional<size_t> tag_search(const basic_string<char_type>& key, const node_piece_v<char_type>& path, const std::size_t layer_level) {
 		for (auto i = layer_level; 0 < i; --i) {
 			if (path[i].tag == key) return i;
 		}
-		return (path.front().tag == key) ? std::size_t{} : boost::optional<std::size_t>{};//none
+		return (path.front().tag == key) ? size_t{} : boost::optional<size_t>{};//none
 	}
 	template<typename char_type, std::enable_if_t<is_char_type<char_type>::value, std::nullptr_t> = nullptr>
-	void html_extract_impl(std::vector<std::basic_string<char_type>>& re, const boost::property_tree::basic_ptree<std::basic_string<char_type>, std::basic_string<char_type>>& pt, const std::vector<node_select_piece<char_type>>& path, std::size_t layer_level = 0U) {//1~
+	void html_extract_impl(vector<basic_string<char_type>>& re, const ptree_c<char_type>& pt, const node_piece_v<char_type>& path, size_t layer_level = 0U) {//1~
 		if (pt.size()) {//childがあるか
 			for (auto& p : pt) {
-				const boost::optional<std::size_t> search_re = tag_search(p.first, path, layer_level);
+				const boost::optional<size_t> search_re = tag_search(p.first, path, layer_level);
 				if (search_re) {
 					const detail::node_select_piece<char_type>& n = path[*search_re];
 					if (!n.attr || has_attribute(p.second, n.type, n.attr.get())) {
