@@ -106,6 +106,9 @@ namespace detail {
 							html_extract_impl(re, p.second, path, *search_re + 1);//recursion
 						}
 					}
+					else {
+						html_extract_impl(re, p.second, path, layer_level);//recursion
+					}
 				}
 				else {
 					html_extract_impl(re, p.second, path, layer_level);//recursion
